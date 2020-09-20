@@ -14,7 +14,9 @@ namespace docs_finder
             return ctx.Docs
                 .Where(d =>
                     EF.Functions.Like(d.LoweredTitle, $"%{query}%")
-                ).ToList();
+                )
+                .OrderBy(d => d.Date)
+                .ToList();
         }
     }
 }
