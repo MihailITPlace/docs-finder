@@ -62,12 +62,14 @@ namespace docs_finder
             GetConversationsResult conversations = null;
             var result = new List<long>();
             ulong? offset = 0;
+            ulong? blockSize = 50;
+            var maxDate = lastDate;
 
             do
             {
                 conversations = _api.Messages.GetConversations(new GetConversationsParams
                 {
-                    Count = 200,
+                    Count = blockSize,
                     Extended = false,
                     Offset = offset
                 });
@@ -78,15 +80,16 @@ namespace docs_finder
                         .Select(item => item.Conversation.Peer.Id).ToList()
                     );
 
-                var tmpDate = conversations.Items.Max(i => i.LastMessage.Date);
-                lastDate = lastDate.Date > tmpDate.Value ? lastDate : tmpDate.Value;
+                var minDate = conversations.Items.Min(i => i.LastMessage.Date).Value;
+                var tmp = conversations.Items.Max(i => i.LastMessage.Date).Value;
+                maxDate = maxDate > tmp ? maxDate : tmp;
                 
-                offset += 200;
-                
-                Thread.Sleep(500);
-            } while (conversations.Items.Count == 200);
+                if (minDate < lastDate) break;
+                offset += blockSize;
+                Thread.Sleep(250);
+            } while ((ulong)conversations.Items.Count == blockSize.Value);
 
-            return (lastDate, result);
+            return (maxDate, result);
         }
 
         private List<Doc> GetNewDocsForPeer(long peerId, DateTime lastDocDate)
@@ -99,16 +102,18 @@ namespace docs_finder
             {
                 var attachments = _api.Messages.GetHistoryAttachments(new MessagesGetHistoryAttachmentsParams
                 {
-                    Count = 200,
+                    Count = 50,
                     StartFrom = start,
                     MediaType = MediaType.Doc,
                     PeerId = peerId
                 }, out next);
                 start = next;
 
-                res.AddRange(attachments
+                var vkDocs = attachments
                     .Where(a => (a.Attachment.Instance is Document))
-                    .Select(a => (Document) a.Attachment.Instance)
+                    .Select(a => (Document) a.Attachment.Instance).ToList();
+                
+                res.AddRange(vkDocs
                     .Where(d => d.Date.Value > lastDocDate)
                     .Select(d => new Doc
                 {
@@ -118,8 +123,10 @@ namespace docs_finder
                     Uri = d.Uri,
                     PeerId = peerId
                 }));
-                
-                Thread.Sleep(400);
+
+                var minDate =vkDocs.Min(d => d.Date);
+                if (minDate.HasValue && (minDate.Value.Date < lastDocDate.Date)) break;
+                Thread.Sleep(250);
             } while (!string.IsNullOrEmpty(next));
 
             return res;

@@ -30,20 +30,12 @@ namespace docs_finder
                         indexer.IndexNewDocs();
                     }
 
-                    var query = string.Empty;
                     if (!string.IsNullOrEmpty(o.Query))
                     {
-                        query = o.Query;
+                        var searcher = new DocSearcher();
+                        var results = searcher.Search(o.Query.ToLower());
+                        results.ForEach(Helpers.PrintDoc);
                     }
-                    else
-                    {
-                        Console.WriteLine("Введите запрос:");
-                        query = Console.ReadLine();
-                    }
-
-                    var searcher = new DocSearcher();
-                    var results = searcher.Search(query.ToLower());
-                    results.ForEach(Helpers.PrintDoc);
                 });
         }
     }
